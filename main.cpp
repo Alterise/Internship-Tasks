@@ -45,6 +45,7 @@ int main() {
         
         std::cout << std::endl;
     }
+    
     pthread_mutex_destroy(&utility_mutexes.first);
     pthread_mutex_destroy(&utility_mutexes.second);
     pthread_mutex_destroy(&role_mutexes.first);
