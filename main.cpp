@@ -49,6 +49,7 @@ int main() {
     pthread_mutex_destroy(&utility_mutexes.second);
     pthread_mutex_destroy(&role_mutexes.first);
     pthread_mutex_destroy(&role_mutexes.second);
+    
     return 0;
 }
 
