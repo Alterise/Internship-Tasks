@@ -7,10 +7,10 @@
 #include <unistd.h>
 #include <random>
 
-#define WRITER_COUNT 25
-#define READER_COUNT 15
-#define ITERATION_COUNT 10
-#define DELAY 500 // В микросекундах (10^(-6) с.)
+#define WRITER_COUNT 100
+#define READER_COUNT 100
+#define ITERATION_COUNT 25
+#define DELAY 250 // В микросекундах (10^(-6) с.)
 
 void *writer_creator(void *);
 void *reader_creator(void *);
@@ -26,11 +26,7 @@ std::mt19937 distribution_seed(randomizer_seed());
 std::uniform_int_distribution<int> distribution(0, 1000);
 
 int main() {
-    const std::string filename = "../sometext.txt";
-
-    //Чищу файл, если в нём что-то было
-    std::ofstream file(filename);
-    file.close();
+    std::vector<int> numbers;
 
     for (size_t i = 0; i < ITERATION_COUNT; i++)
     {
@@ -38,8 +34,8 @@ int main() {
 
         pthread_t w_creator, r_creator;
         //Параллельно создаю потоки-читатели и потоки-писатели
-        pthread_create(&w_creator, NULL, writer_creator, (void *) &filename);
-        pthread_create(&r_creator, NULL, reader_creator, (void *) &filename);
+        pthread_create(&w_creator, NULL, writer_creator, (void *) &numbers);
+        pthread_create(&r_creator, NULL, reader_creator, (void *) &numbers);
         pthread_join(w_creator, NULL);
         pthread_join(r_creator, NULL);
 
@@ -54,11 +50,11 @@ int main() {
     return 0;
 }
 
-void *writer_creator(void *filename) {
+void *writer_creator(void *numbers) {
     std::vector<pthread_t> writer_threads(WRITER_COUNT);
     for (auto &thread : writer_threads)
     {
-        pthread_create(&thread, NULL, writer_function, filename);
+        pthread_create(&thread, NULL, writer_function, numbers);
         usleep(DELAY);
     }
     for (auto &thread : writer_threads)
@@ -68,11 +64,11 @@ void *writer_creator(void *filename) {
     pthread_exit(NULL);
 }
 
-void *reader_creator(void *filename) {
+void *reader_creator(void *numbers) {
     std::vector<pthread_t> reader_threads(WRITER_COUNT);
     for (auto &thread : reader_threads)
     {
-        pthread_create(&thread, NULL, reader_function, filename);
+        pthread_create(&thread, NULL, reader_function, numbers);
         usleep(DELAY);
     }
     for (auto &thread : reader_threads)
@@ -83,7 +79,7 @@ void *reader_creator(void *filename) {
 }
 
 // Поток писатель пишет в конец файла случайное число от 0 до 1000
-void *writer_function(void *filename) {
+void *writer_function(void *numbers) {
     pthread_mutex_lock(&utility_mutexes.first);
     role_counters.first++;
     if(role_counters.first == 1) {
@@ -92,10 +88,8 @@ void *writer_function(void *filename) {
     pthread_mutex_unlock(&utility_mutexes.first);
 
     pthread_mutex_lock(&role_mutexes.first);
-    std::ofstream file(*((std::string*)filename), std::ios::app);
-    int number = distribution(distribution_seed);
-    file << number << std::endl;
-    std::cout << "Writer thread added number " << number << " in " << *((std::string*)filename) << std::endl;
+    ((std::vector<int>*)numbers)->push_back(distribution(distribution_seed));
+    std::cout << "Writer thread added number " << ((std::vector<int>*)numbers)->back() << std::endl;
     pthread_mutex_unlock(&role_mutexes.first);
 
     pthread_mutex_lock(&utility_mutexes.first);
@@ -109,7 +103,7 @@ void *writer_function(void *filename) {
 }
 
 // Поток читатель считает сумму чисел из файла и выводит её в стандартный поток вывода
-void *reader_function(void *filename) {
+void *reader_function(void *numbers) {
     pthread_mutex_lock(&role_mutexes.second);
     pthread_mutex_lock(&utility_mutexes.second);
     role_counters.second++;
@@ -119,13 +113,9 @@ void *reader_function(void *filename) {
     pthread_mutex_unlock(&utility_mutexes.second);
     pthread_mutex_unlock(&role_mutexes.second);
 
-    int sum = 0;
-    int number;
-    std::ifstream file(*((std::string*)filename));
-    while (file >> number) {
-        sum += number;
-    }
-    std::cout << "Reader thread calculated the sum of numbers from " << *((std::string*)filename) << ": " << sum << std::endl;
+    std::cout << "Reader thread calculated the sum of numbers: " 
+              << std::accumulate(((std::vector<int>*)numbers)->begin(), ((std::vector<int>*)numbers)->end(), 0) 
+              << std::endl;
 
     pthread_mutex_lock(&utility_mutexes.second);
     role_counters.second--;
